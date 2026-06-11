@@ -3,110 +3,153 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>LAP Roof Grid Tracker</title>
+  <title>LAP Roof Tracker</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-  <div id="header">
-    <h1>LAP ROOF GRID TRACKER</h1>
-    <p>Louisville Assembly Plant — Click any bay to update condition</p>
+<!-- HEADER -->
+<header class="app-header">
+  <div class="header-left">
+    <h1>🏭 LAP Roof Tracker</h1>
+    <span class="header-sub">Main Building — Leak Severity Tracking</span>
+  </div>
+  <div class="header-right">
+    <button id="toggle-repaired-btn" class="header-btn" onclick="toggleRepairedView()">Hide Repaired Bays</button>
+    <button class="header-btn export-btn" onclick="exportCSV()">⬇ Export CSV</button>
+    <button class="header-btn reset-btn" onclick="resetAll()">↺ Reset All</button>
+  </div>
+</header>
+
+<!-- SUMMARY BAR -->
+<div class="summary-bar">
+  <div class="summary-item">
+    <span class="sum-label">Total Bays</span>
+    <span class="sum-count" id="count-total">0</span>
+  </div>
+  <div class="summary-item ni">
+    <span class="sum-label">Not Inspected</span>
+    <span class="sum-count" id="count-ni">0</span>
+  </div>
+  <div class="summary-item s1">
+    <span class="sum-label">S1</span>
+    <span class="sum-count" id="count-s1">0</span>
+  </div>
+  <div class="summary-item s2">
+    <span class="sum-label">S2</span>
+    <span class="sum-count" id="count-s2">0</span>
+  </div>
+  <div class="summary-item s3">
+    <span class="sum-label">S3</span>
+    <span class="sum-count" id="count-s3">0</span>
+  </div>
+  <div class="summary-item s4">
+    <span class="sum-label">S4</span>
+    <span class="sum-count" id="count-s4">0</span>
+  </div>
+  <div class="summary-item s5">
+    <span class="sum-label">S5</span>
+    <span class="sum-count" id="count-s5">0</span>
+  </div>
+  <div class="summary-item repaired">
+    <span class="sum-label">Repaired</span>
+    <span class="sum-count" id="count-repaired">0</span>
+  </div>
+</div>
+
+<!-- SEVERITY LEGEND BAR -->
+<div class="legend-bar">
+  <span class="legend-title">SEVERITY:</span>
+  <span class="leg s1">S1 — Water in Aisle</span>
+  <span class="leg s2">S2 — Water in Walkway</span>
+  <span class="leg s3">S3 — Water on Equipment</span>
+  <span class="leg s4">S4 — Water on Control Panels</span>
+  <span class="leg s5">S5 — Electrical Bus/Panel or Possible Injury</span>
+  <span class="leg repaired">✅ Repaired</span>
+</div>
+
+<!-- GRID -->
+<div class="grid-wrapper">
+  <table id="bay-grid">
+    <thead id="grid-header"></thead>
+    <tbody id="grid-body"></tbody>
+  </table>
+</div>
+
+<!-- OVERLAY -->
+<div id="overlay" class="overlay hidden"></div>
+
+<!-- POPUP -->
+<div id="popup" class="popup hidden">
+
+  <div class="popup-header">
+    <div>
+      <h2 id="popup-bay-id"></h2>
+      <p id="popup-section" class="popup-section-label"></p>
+    </div>
+    <button class="close-btn" onclick="closePopup()">✕</button>
   </div>
 
-  <div id="summary-bar">
-    <div class="summary-card" id="card-total">
-      <div class="card-number" id="count-total">0</div>
-      <div class="card-label">TOTAL BAYS</div>
+  <div class="popup-status-bar">
+    <span>Current Status: <strong id="popup-current-status"></strong></span>
+    <span>Last Inspected: <strong id="popup-last-date"></strong> by <strong id="popup-last-inspector"></strong></span>
+  </div>
+
+  <!-- SEVERITY SELECTION -->
+  <div class="popup-block">
+    <h3 class="block-title">Select Severity Level</h3>
+    <div class="severity-legend-box">
+      <div class="sev-legend-row"><span class="sev-badge s1">S1</span> Water in Aisle</div>
+      <div class="sev-legend-row"><span class="sev-badge s2">S2</span> Water in Walkway</div>
+      <div class="sev-legend-row"><span class="sev-badge s3">S3</span> Water on Equipment</div>
+      <div class="sev-legend-row"><span class="sev-badge s4">S4</span> Water on Control Panels</div>
+      <div class="sev-legend-row"><span class="sev-badge s5">S5</span> Water on Electrical Bus/Panel or Possible Injury</div>
     </div>
-    <div class="summary-card not-inspected">
-      <div class="card-number" id="count-ni">0</div>
-      <div class="card-label">NOT INSPECTED</div>
-    </div>
-    <div class="summary-card good">
-      <div class="card-number" id="count-good">0</div>
-      <div class="card-label">GOOD</div>
-    </div>
-    <div class="summary-card fair">
-      <div class="card-number" id="count-fair">0</div>
-      <div class="card-label">FAIR</div>
-    </div>
-    <div class="summary-card poor">
-      <div class="card-number" id="count-poor">0</div>
-      <div class="card-label">POOR</div>
-    </div>
-    <div class="summary-card critical">
-      <div class="card-number" id="count-crit">0</div>
-      <div class="card-label">CRITICAL</div>
+    <div class="sev-btn-row">
+      <button id="sev-btn-S1" class="sev-btn s1-btn" onclick="selectSeverity('S1')">S1</button>
+      <button id="sev-btn-S2" class="sev-btn s2-btn" onclick="selectSeverity('S2')">S2</button>
+      <button id="sev-btn-S3" class="sev-btn s3-btn" onclick="selectSeverity('S3')">S3</button>
+      <button id="sev-btn-S4" class="sev-btn s4-btn" onclick="selectSeverity('S4')">S4</button>
+      <button id="sev-btn-S5" class="sev-btn s5-btn" onclick="selectSeverity('S5')">S5</button>
     </div>
   </div>
 
-  <div id="legend">
-    <span class="legend-title">LEGEND:</span>
-    <span class="legend-box ni-box">Not Inspected</span>
-    <span class="legend-box good-box">Good</span>
-    <span class="legend-box fair-box">Fair</span>
-    <span class="legend-box poor-box">Poor</span>
-    <span class="legend-box crit-box">Critical</span>
-    <button id="export-btn" onclick="exportCSV()">⬇ Export CSV</button>
-    <button id="reset-btn" onclick="resetAll()">↺ Reset All</button>
+  <!-- REPAIRED TOGGLE — hidden until severity selected -->
+  <div id="repaired-section" class="popup-block hidden">
+    <button id="repaired-btn" class="repaired-toggle-btn" onclick="toggleRepairedStatus()">
+      Mark as Repaired
+    </button>
   </div>
 
-  <div id="grid-wrapper">
-    <div id="grid-container">
-      <table id="roof-grid">
-        <thead id="grid-header"></thead>
-        <tbody id="grid-body"></tbody>
-      </table>
-    </div>
+  <!-- INSPECTOR DETAILS -->
+  <div class="popup-block">
+    <label class="form-label">Inspector Name</label>
+    <input type="text" id="input-inspector" class="form-input" placeholder="Enter your name" />
+
+    <label class="form-label">Work Order #</label>
+    <input type="text" id="input-wo" class="form-input" placeholder="Optional" />
+
+    <label class="form-label">📷 Photo Link</label>
+    <input type="text" id="input-photo" class="form-input" placeholder="Paste OneDrive or SharePoint link" />
+
+    <label class="form-label">Notes</label>
+    <textarea id="input-notes" class="form-textarea" placeholder="Describe condition, location of issue, etc."></textarea>
   </div>
 
-  <!-- UPDATE POPUP -->
-  <div id="overlay" class="hidden"></div>
-  <div id="popup" class="hidden">
-    <div id="popup-header">
-      <h2 id="popup-bay-id">Bay A-001</h2>
-      <span id="popup-section"></span>
-    </div>
-    <div id="popup-current">
-      Current: <strong id="popup-current-cond"></strong>
-    </div>
-    <div id="popup-last">
-      Last Inspected: <span id="popup-last-date">Never</span>
-      by <span id="popup-last-inspector">-</span>
-    </div>
-
-    <div class="popup-field">
-      <label>Condition</label>
-      <div id="condition-buttons">
-        <button class="cond-btn good-btn"  onclick="selectCond('Good')">Good</button>
-        <button class="cond-btn fair-btn"  onclick="selectCond('Fair')">Fair</button>
-        <button class="cond-btn poor-btn"  onclick="selectCond('Poor')">Poor</button>
-        <button class="cond-btn crit-btn"  onclick="selectCond('Critical')">Critical</button>
-        <button class="cond-btn ni-btn"    onclick="selectCond('Not Inspected')">Not Inspected</button>
-      </div>
-    </div>
-
-    <div class="popup-field">
-      <label>Inspector Name</label>
-      <input type="text" id="input-inspector" placeholder="Enter your name" />
-    </div>
-
-    <div class="popup-field">
-      <label>Work Order #</label>
-      <input type="text" id="input-wo" placeholder="Optional" />
-    </div>
-
-    <div class="popup-field">
-      <label>Notes</label>
-      <textarea id="input-notes" placeholder="Describe condition, location of issue, etc." rows="3"></textarea>
-    </div>
-
-    <div id="popup-actions">
-      <button id="cancel-btn" onclick="closePopup()">Cancel</button>
-      <button id="save-btn" onclick="saveBay()">Save</button>
-    </div>
+  <!-- ACTION BUTTONS -->
+  <div class="popup-actions">
+    <button class="btn-cancel" onclick="closePopup()">Cancel</button>
+    <button class="btn-save" onclick="saveBay()">Save Inspection</button>
   </div>
 
-  <script src="app.js"></script>
+  <!-- HISTORY LOG -->
+  <div class="popup-block history-block">
+    <h3 class="block-title">📋 Inspection History</h3>
+    <div id="history-log"></div>
+  </div>
+
+</div>
+
+<script src="app.js"></script>
 </body>
 </html>
