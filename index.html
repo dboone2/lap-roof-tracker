@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>LAP Roof Grid Tracker</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div id="header">
+    <h1>LAP ROOF GRID TRACKER</h1>
+    <p>Louisville Assembly Plant — Click any bay to update condition</p>
+  </div>
+
+  <div id="summary-bar">
+    <div class="summary-card" id="card-total">
+      <div class="card-number" id="count-total">0</div>
+      <div class="card-label">TOTAL BAYS</div>
+    </div>
+    <div class="summary-card not-inspected">
+      <div class="card-number" id="count-ni">0</div>
+      <div class="card-label">NOT INSPECTED</div>
+    </div>
+    <div class="summary-card good">
+      <div class="card-number" id="count-good">0</div>
+      <div class="card-label">GOOD</div>
+    </div>
+    <div class="summary-card fair">
+      <div class="card-number" id="count-fair">0</div>
+      <div class="card-label">FAIR</div>
+    </div>
+    <div class="summary-card poor">
+      <div class="card-number" id="count-poor">0</div>
+      <div class="card-label">POOR</div>
+    </div>
+    <div class="summary-card critical">
+      <div class="card-number" id="count-crit">0</div>
+      <div class="card-label">CRITICAL</div>
+    </div>
+  </div>
+
+  <div id="legend">
+    <span class="legend-title">LEGEND:</span>
+    <span class="legend-box ni-box">Not Inspected</span>
+    <span class="legend-box good-box">Good</span>
+    <span class="legend-box fair-box">Fair</span>
+    <span class="legend-box poor-box">Poor</span>
+    <span class="legend-box crit-box">Critical</span>
+    <button id="export-btn" onclick="exportCSV()">⬇ Export CSV</button>
+    <button id="reset-btn" onclick="resetAll()">↺ Reset All</button>
+  </div>
+
+  <div id="grid-wrapper">
+    <div id="grid-container">
+      <table id="roof-grid">
+        <thead id="grid-header"></thead>
+        <tbody id="grid-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- UPDATE POPUP -->
+  <div id="overlay" class="hidden"></div>
+  <div id="popup" class="hidden">
+    <div id="popup-header">
+      <h2 id="popup-bay-id">Bay A-001</h2>
+      <span id="popup-section"></span>
+    </div>
+    <div id="popup-current">
+      Current: <strong id="popup-current-cond"></strong>
+    </div>
+    <div id="popup-last">
+      Last Inspected: <span id="popup-last-date">Never</span>
+      by <span id="popup-last-inspector">-</span>
+    </div>
+
+    <div class="popup-field">
+      <label>Condition</label>
+      <div id="condition-buttons">
+        <button class="cond-btn good-btn"  onclick="selectCond('Good')">Good</button>
+        <button class="cond-btn fair-btn"  onclick="selectCond('Fair')">Fair</button>
+        <button class="cond-btn poor-btn"  onclick="selectCond('Poor')">Poor</button>
+        <button class="cond-btn crit-btn"  onclick="selectCond('Critical')">Critical</button>
+        <button class="cond-btn ni-btn"    onclick="selectCond('Not Inspected')">Not Inspected</button>
+      </div>
+    </div>
+
+    <div class="popup-field">
+      <label>Inspector Name</label>
+      <input type="text" id="input-inspector" placeholder="Enter your name" />
+    </div>
+
+    <div class="popup-field">
+      <label>Work Order #</label>
+      <input type="text" id="input-wo" placeholder="Optional" />
+    </div>
+
+    <div class="popup-field">
+      <label>Notes</label>
+      <textarea id="input-notes" placeholder="Describe condition, location of issue, etc." rows="3"></textarea>
+    </div>
+
+    <div id="popup-actions">
+      <button id="cancel-btn" onclick="closePopup()">Cancel</button>
+      <button id="save-btn" onclick="saveBay()">Save</button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
