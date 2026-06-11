@@ -1,6 +1,6 @@
 // ============================================
-// LAP ROOF GRID TRACKER
-// app.js — Main Building A thru Q
+// LAP ROOF TRACKER — app.js v3
+// Main Building — Severity Based Tracking
 // ============================================
 
 const ROWS = [
@@ -29,11 +29,13 @@ const COLS = [
   "42","43","44","45","46"
 ];
 
-const STORAGE_KEY = "lapRoofData_v2";
+const STORAGE_KEY = "lapRoofData_v3";
 
-let bayData = {};
-let selectedCond = "";
-let activeBayId = "";
+let bayData        = {};
+let selectedSeverity = "";
+let isRepaired     = false;
+let activeBayId    = "";
+let hideRepaired   = false;
 
 // ---- INIT ----
 function init() {
@@ -42,7 +44,20 @@ function init() {
   updateSummary();
 }
 
-// ---- LOAD / SAVE DATA ----
+// ---- CREATE EMPTY BAY ----
+function createEmptyBay(id, row, col, section) {
+  return {
+    id,
+    row,
+    col,
+    section,
+    currentStatus:   "Not Inspected",
+    currentSeverity: "",
+    history:         []
+  };
+}
+
+// ---- LOAD DATA ----
 function loadData() {
   const stored = localStorage.getItem(STORAGE_KEY);
   if (stored) {
@@ -51,23 +66,14 @@ function loadData() {
     ROWS.forEach(row => {
       COLS.forEach(col => {
         const id = row.label + "-" + col;
-        bayData[id] = {
-          id:        id,
-          row:       row.label,
-          col:       col,
-          section:   row.section,
-          condition: "Not Inspected",
-          lastDate:  "",
-          inspector: "",
-          workOrder: "",
-          notes:     ""
-        };
+        bayData[id] = createEmptyBay(id, row.label, col, row.section);
       });
     });
     saveData();
   }
 }
 
+// ---- SAVE DATA ----
 function saveData() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(bayData));
 }
@@ -79,7 +85,7 @@ function buildGrid() {
   thead.innerHTML = "";
   tbody.innerHTML = "";
 
-  // Header row — column labels
+  // Header row
   const headerRow = document.createElement("tr");
   const cornerTh  = document.createElement("th");
   cornerTh.className   = "row-header-top";
@@ -89,10 +95,7 @@ function buildGrid() {
   COLS.forEach(col => {
     const th = document.createElement("th");
     th.textContent = col;
-    // Visual divider after col 01 (end of the negative side)
-    if (col === "01") {
-      th.style.borderRight = "3px solid #ffcc00";
-    }
+    if (col === "01") th.classList.add("col-divider");
     headerRow.appendChild(th);
   });
 
@@ -102,28 +105,20 @@ function buildGrid() {
   ROWS.forEach(row => {
     const tr = document.createElement("tr");
 
-    // Row label
     const labelTd = document.createElement("td");
     labelTd.className   = "row-label";
     labelTd.textContent = row.label;
     tr.appendChild(labelTd);
 
-    // Bay cells
     COLS.forEach(col => {
       const id = row.label + "-" + col;
       const td = document.createElement("td");
       td.className = "bay-cell";
       td.id        = "cell-" + id;
-      td.textContent = id;
       td.title     = id + " — " + row.section;
+      if (col === "01") td.classList.add("col-divider");
       td.onclick   = () => openPopup(id);
-
-      // Visual divider after col 01
-      if (col === "01") {
-        td.style.borderRight = "3px solid #ffcc00";
-      }
-
-      applyCondColor(td, bayData[id] ? bayData[id].condition : "Not Inspected");
+      applyCell(td, bayData[id]);
       tr.appendChild(td);
     });
 
@@ -131,120 +126,259 @@ function buildGrid() {
   });
 }
 
-// ---- APPLY COLOR TO CELL ----
-function applyCondColor(td, condition) {
-  td.classList.remove("cond-good","cond-fair","cond-poor","cond-critical","cond-ni");
-  switch (condition) {
-    case "Good":     td.classList.add("cond-good");     break;
-    case "Fair":     td.classList.add("cond-fair");     break;
-    case "Poor":     td.classList.add("cond-poor");     break;
-    case "Critical": td.classList.add("cond-critical"); break;
-    default:         td.classList.add("cond-ni");       break;
+// ---- APPLY CELL DISPLAY ----
+function applyCell(td, bay) {
+  td.classList.remove(
+    "cond-ni","cond-s1","cond-s2","cond-s3",
+    "cond-s4","cond-s5","cond-repaired"
+  );
+
+  if (bay.currentStatus === "Repaired") {
+    td.classList.add("cond-repaired");
+    td.innerHTML   = bay.id + "<br><small>" + bay.currentSeverity + " ✅</small>";
+    td.style.opacity = hideRepaired ? "0.15" : "1";
+  } else if (bay.currentSeverity) {
+    td.classList.add("cond-" + bay.currentSeverity.toLowerCase());
+    td.innerHTML   = bay.id + "<br><small>" + bay.currentSeverity + "</small>";
+    td.style.opacity = "1";
+  } else {
+    td.classList.add("cond-ni");
+    td.textContent = bay.id;
+    td.style.opacity = "1";
   }
+}
+
+// ---- UPDATE SINGLE CELL ----
+function updateCell(bayId) {
+  const td = document.getElementById("cell-" + bayId);
+  if (td) applyCell(td, bayData[bayId]);
 }
 
 // ---- UPDATE SUMMARY COUNTS ----
 function updateSummary() {
-  let total = 0, ni = 0, good = 0, fair = 0, poor = 0, crit = 0;
+  let total = 0, ni = 0, s1 = 0, s2 = 0, s3 = 0, s4 = 0, s5 = 0, repaired = 0;
+
   Object.values(bayData).forEach(b => {
     total++;
-    switch (b.condition) {
-      case "Good":     good++; break;
-      case "Fair":     fair++; break;
-      case "Poor":     poor++; break;
-      case "Critical": crit++; break;
-      default:         ni++;   break;
+    if (b.currentStatus === "Repaired") { repaired++; return; }
+    switch (b.currentSeverity) {
+      case "S1": s1++; break;
+      case "S2": s2++; break;
+      case "S3": s3++; break;
+      case "S4": s4++; break;
+      case "S5": s5++; break;
+      default:   ni++; break;
     }
   });
-  document.getElementById("count-total").textContent = total;
-  document.getElementById("count-ni").textContent    = ni;
-  document.getElementById("count-good").textContent  = good;
-  document.getElementById("count-fair").textContent  = fair;
-  document.getElementById("count-poor").textContent  = poor;
-  document.getElementById("count-crit").textContent  = crit;
+
+  document.getElementById("count-total").textContent    = total;
+  document.getElementById("count-ni").textContent       = ni;
+  document.getElementById("count-s1").textContent       = s1;
+  document.getElementById("count-s2").textContent       = s2;
+  document.getElementById("count-s3").textContent       = s3;
+  document.getElementById("count-s4").textContent       = s4;
+  document.getElementById("count-s5").textContent       = s5;
+  document.getElementById("count-repaired").textContent = repaired;
 }
 
 // ---- OPEN POPUP ----
 function openPopup(bayId) {
-  activeBayId  = bayId;
-  selectedCond = "";
-  const bay    = bayData[bayId];
+  activeBayId      = bayId;
+  selectedSeverity = "";
+  isRepaired       = false;
 
-  document.getElementById("popup-bay-id").textContent        = bayId;
-  document.getElementById("popup-section").textContent       = bay.section;
-  document.getElementById("popup-current-cond").textContent  = bay.condition;
-  document.getElementById("popup-last-date").textContent     = bay.lastDate  || "Never";
-  document.getElementById("popup-last-inspector").textContent = bay.inspector || "-";
-  document.getElementById("input-inspector").value = bay.inspector || "";
-  document.getElementById("input-wo").value        = bay.workOrder || "";
-  document.getElementById("input-notes").value     = bay.notes     || "";
+  const bay = bayData[bayId];
 
-  document.querySelectorAll(".cond-btn").forEach(b => b.classList.remove("selected"));
+  document.getElementById("popup-bay-id").textContent      = bayId;
+  document.getElementById("popup-section").textContent     = bay.section;
+
+  const statusText = bay.currentStatus +
+    (bay.currentSeverity ? " (" + bay.currentSeverity + ")" : "");
+  document.getElementById("popup-current-status").textContent = statusText;
+
+  const lastEntry = bay.history.length > 0
+    ? bay.history[bay.history.length - 1]
+    : null;
+
+  document.getElementById("popup-last-date").textContent =
+    lastEntry ? lastEntry.date : "Never";
+  document.getElementById("popup-last-inspector").textContent =
+    lastEntry ? lastEntry.inspector : "-";
+
+  // Reset form
+  document.getElementById("input-inspector").value = "";
+  document.getElementById("input-wo").value        = "";
+  document.getElementById("input-notes").value     = "";
+  document.getElementById("input-photo").value     = "";
+
+  // Reset severity buttons
+  document.querySelectorAll(".sev-btn").forEach(b => b.classList.remove("selected"));
+
+  // Hide repaired section and reset its button
+  document.getElementById("repaired-section").classList.add("hidden");
+  const repairedBtn = document.getElementById("repaired-btn");
+  repairedBtn.classList.remove("active");
+  repairedBtn.textContent = "Mark as Repaired";
+
+  // Build history log
+  buildHistoryLog(bay);
 
   document.getElementById("overlay").classList.remove("hidden");
   document.getElementById("popup").classList.remove("hidden");
 }
 
-// ---- SELECT CONDITION ----
-function selectCond(cond) {
-  selectedCond = cond;
-  document.querySelectorAll(".cond-btn").forEach(b => b.classList.remove("selected"));
-  const map = {
-    "Good":         ".good-btn",
-    "Fair":         ".fair-btn",
-    "Poor":         ".poor-btn",
-    "Critical":     ".crit-btn",
-    "Not Inspected":".ni-btn"
-  };
-  const btn = document.querySelector(map[cond]);
-  if (btn) btn.classList.add("selected");
+// ---- SELECT SEVERITY ----
+function selectSeverity(sev) {
+  selectedSeverity = sev;
+  isRepaired       = false;
+
+  document.querySelectorAll(".sev-btn").forEach(b => b.classList.remove("selected"));
+  document.getElementById("sev-btn-" + sev).classList.add("selected");
+
+  // Reveal repaired toggle and reset it
+  document.getElementById("repaired-section").classList.remove("hidden");
+  const repairedBtn = document.getElementById("repaired-btn");
+  repairedBtn.classList.remove("active");
+  repairedBtn.textContent = "Mark as Repaired";
+}
+
+// ---- TOGGLE REPAIRED STATUS INSIDE POPUP ----
+function toggleRepairedStatus() {
+  isRepaired = !isRepaired;
+  const btn  = document.getElementById("repaired-btn");
+  if (isRepaired) {
+    btn.classList.add("active");
+    btn.textContent = "✅ Marked as Repaired — Click to Undo";
+  } else {
+    btn.classList.remove("active");
+    btn.textContent = "Mark as Repaired";
+  }
+}
+
+// ---- BUILD HISTORY LOG ----
+function buildHistoryLog(bay) {
+  const log = document.getElementById("history-log");
+
+  if (!bay.history || bay.history.length === 0) {
+    log.innerHTML = "<p class='no-history'>No inspection history yet.</p>";
+    return;
+  }
+
+  const entries = [...bay.history].reverse();
+
+  log.innerHTML = entries.map(e => {
+    const isRep      = e.status === "Repaired";
+    const sevClass   = e.severity ? "sev-" + e.severity.toLowerCase() : "";
+    const woHTML     = e.workOrder
+      ? `<span>WO#: ${e.workOrder}</span>` : "";
+    const notesHTML  = e.notes
+      ? `<div class="hist-notes">${e.notes}</div>` : "";
+    const photoHTML  = e.photoLink
+      ? `<div class="hist-photo">
+           <a href="${e.photoLink}" target="_blank" rel="noopener">📷 View Photo</a>
+         </div>` : "";
+
+    return `
+      <div class="history-entry ${isRep ? 'hist-repaired' : 'hist-issue'}">
+        <div class="hist-header">
+          <span class="hist-date">${e.date}</span>
+          <span class="hist-severity ${sevClass}">${e.severity || ""}</span>
+          <span class="hist-status ${isRep ? 'repaired' : ''}">${e.status}</span>
+        </div>
+        <div class="hist-details">
+          <span>Inspector: ${e.inspector}</span>
+          ${woHTML}
+        </div>
+        ${notesHTML}
+        ${photoHTML}
+      </div>
+    `;
+  }).join("");
+}
+
+// ---- SAVE BAY ----
+function saveBay() {
+  if (!selectedSeverity) {
+    alert("Please select a severity level (S1 – S5) before saving.");
+    return;
+  }
+
+  const inspector = document.getElementById("input-inspector").value.trim() || "Unknown";
+  const workOrder  = document.getElementById("input-wo").value.trim();
+  const notes      = document.getElementById("input-notes").value.trim();
+  const photoLink  = document.getElementById("input-photo").value.trim();
+  const today      = new Date().toLocaleDateString("en-US");
+  const status     = isRepaired ? "Repaired" : "Issue";
+
+  const entry = { date: today, inspector, severity: selectedSeverity,
+                  status, workOrder, notes, photoLink };
+
+  if (!bayData[activeBayId].history) bayData[activeBayId].history = [];
+  bayData[activeBayId].history.push(entry);
+  bayData[activeBayId].currentSeverity = selectedSeverity;
+  bayData[activeBayId].currentStatus   = status;
+
+  saveData();
+  updateCell(activeBayId);
+  updateSummary();
+  closePopup();
+}
+
+// ---- TOGGLE REPAIRED VIEW — HEADER BUTTON ----
+function toggleRepairedView() {
+  hideRepaired    = !hideRepaired;
+  const btn       = document.getElementById("toggle-repaired-btn");
+  btn.textContent = hideRepaired ? "Show Repaired Bays" : "Hide Repaired Bays";
+  hideRepaired ? btn.classList.add("active") : btn.classList.remove("active");
+  Object.keys(bayData).forEach(id => updateCell(id));
 }
 
 // ---- CLOSE POPUP ----
 function closePopup() {
   document.getElementById("overlay").classList.add("hidden");
   document.getElementById("popup").classList.add("hidden");
-  activeBayId  = "";
-  selectedCond = "";
-}
-
-// ---- SAVE BAY ----
-function saveBay() {
-  if (!selectedCond) {
-    alert("Please select a condition before saving.");
-    return;
-  }
-  const inspector = document.getElementById("input-inspector").value.trim() || "Unknown";
-  const workOrder = document.getElementById("input-wo").value.trim();
-  const notes     = document.getElementById("input-notes").value.trim();
-  const today     = new Date().toLocaleDateString("en-US");
-
-  bayData[activeBayId].condition = selectedCond;
-  bayData[activeBayId].lastDate  = today;
-  bayData[activeBayId].inspector = inspector;
-  bayData[activeBayId].workOrder = workOrder;
-  bayData[activeBayId].notes     = notes;
-
-  saveData();
-
-  const cell = document.getElementById("cell-" + activeBayId);
-  if (cell) applyCondColor(cell, selectedCond);
-
-  updateSummary();
-  closePopup();
+  activeBayId      = "";
+  selectedSeverity = "";
+  isRepaired       = false;
 }
 
 // ---- EXPORT CSV ----
 function exportCSV() {
-  const headers = ["Bay ID","Row","Column","Section","Condition",
-                   "Last Inspection","Inspector","Work Order","Notes"];
-  const rows = Object.values(bayData).map(b =>
-    [b.id, b.row, b.col, b.section, b.condition,
-     b.lastDate, b.inspector, b.workOrder, b.notes]
-    .map(v => `"${(v || "").toString().replace(/"/g,'""')}"`)
-    .join(",")
-  );
-  const csv  = [headers.join(","), ...rows].join("\n");
+  const headers = [
+    "Bay ID","Row","Column","Section",
+    "Current Status","Current Severity",
+    "Entry #","Date","Inspector","Severity",
+    "Status","Work Order","Notes","Photo Link"
+  ];
+
+  const rows = [];
+  Object.values(bayData).forEach(b => {
+    if (b.history && b.history.length > 0) {
+      b.history.forEach((h, i) => {
+        rows.push([
+          b.id, b.row, b.col, b.section,
+          b.currentStatus, b.currentSeverity,
+          i + 1, h.date, h.inspector, h.severity,
+          h.status, h.workOrder, h.notes, h.photoLink
+        ]);
+      });
+    } else {
+      rows.push([
+        b.id, b.row, b.col, b.section,
+        "Not Inspected", "",
+        "", "", "", "", "", "", "", ""
+      ]);
+    }
+  });
+
+  const csv = [
+    headers.join(","),
+    ...rows.map(r =>
+      r.map(v => `"${(v || "").toString().replace(/"/g, '""')}"`)
+       .join(",")
+    )
+  ].join("\n");
+
   const blob = new Blob([csv], { type: "text/csv" });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement("a");
@@ -256,17 +390,20 @@ function exportCSV() {
 
 // ---- RESET ALL ----
 function resetAll() {
-  if (!confirm("Reset ALL bay data back to Not Inspected?\n\nThis cannot be undone.")) return;
-  Object.keys(bayData).forEach(id => {
-    bayData[id].condition = "Not Inspected";
-    bayData[id].lastDate  = "";
-    bayData[id].inspector = "";
-    bayData[id].workOrder = "";
-    bayData[id].notes     = "";
-    const cell = document.getElementById("cell-" + id);
-    if (cell) applyCondColor(cell, "Not Inspected");
+  if (!confirm(
+    "Reset ALL bay data back to Not Inspected?\n\n" +
+    "This will erase all history and cannot be undone."
+  )) return;
+
+  ROWS.forEach(row => {
+    COLS.forEach(col => {
+      const id = row.label + "-" + col;
+      bayData[id] = createEmptyBay(id, row.label, col, row.section);
+    });
   });
+
   saveData();
+  buildGrid();
   updateSummary();
 }
 
