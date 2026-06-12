@@ -1,155 +1,456 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>LAP Roof Tracker</title>
-  <link rel="stylesheet" href="style.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LAP Roof Tracker</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
-<!-- HEADER -->
-<header class="app-header">
-  <div class="header-left">
-    <h1>🏭 LAP Roof Tracker</h1>
-    <span class="header-sub">Main Building — Leak Severity Tracking</span>
-  </div>
-  <div class="header-right">
-    <button id="toggle-repaired-btn" class="header-btn" onclick="toggleRepairedView()">Hide Repaired Bays</button>
-    <button class="header-btn export-btn" onclick="exportCSV()">⬇ Export CSV</button>
-    <button class="header-btn reset-btn" onclick="resetAll()">↺ Reset All</button>
-  </div>
-</header>
-
-<!-- SUMMARY BAR -->
-<div class="summary-bar">
-  <div class="summary-item">
-    <span class="sum-label">Total Bays</span>
-    <span class="sum-count" id="count-total">0</span>
-  </div>
-  <div class="summary-item ni">
-    <span class="sum-label">Not Inspected</span>
-    <span class="sum-count" id="count-ni">0</span>
-  </div>
-  <div class="summary-item s1">
-    <span class="sum-label">S1</span>
-    <span class="sum-count" id="count-s1">0</span>
-  </div>
-  <div class="summary-item s2">
-    <span class="sum-label">S2</span>
-    <span class="sum-count" id="count-s2">0</span>
-  </div>
-  <div class="summary-item s3">
-    <span class="sum-label">S3</span>
-    <span class="sum-count" id="count-s3">0</span>
-  </div>
-  <div class="summary-item s4">
-    <span class="sum-label">S4</span>
-    <span class="sum-count" id="count-s4">0</span>
-  </div>
-  <div class="summary-item s5">
-    <span class="sum-label">S5</span>
-    <span class="sum-count" id="count-s5">0</span>
-  </div>
-  <div class="summary-item repaired">
-    <span class="sum-label">Repaired</span>
-    <span class="sum-count" id="count-repaired">0</span>
-  </div>
-</div>
-
-<!-- SEVERITY LEGEND BAR -->
-<div class="legend-bar">
-  <span class="legend-title">SEVERITY:</span>
-  <span class="leg s1">S1 — Water in Aisle</span>
-  <span class="leg s2">S2 — Water in Walkway</span>
-  <span class="leg s3">S3 — Water on Equipment</span>
-  <span class="leg s4">S4 — Water on Control Panels</span>
-  <span class="leg s5">S5 — Electrical Bus/Panel or Possible Injury</span>
-  <span class="leg repaired">✅ Repaired</span>
-</div>
-
-<!-- GRID -->
-<div class="grid-wrapper">
-  <table id="bay-grid">
-    <thead id="grid-header"></thead>
-    <tbody id="grid-body"></tbody>
-  </table>
-</div>
-
-<!-- OVERLAY -->
-<div id="overlay" class="overlay hidden"></div>
-
-<!-- POPUP -->
-<div id="popup" class="popup hidden">
-
-  <div class="popup-header">
-    <div>
-      <h2 id="popup-bay-id"></h2>
-      <p id="popup-section" class="popup-section-label"></p>
+    <!-- LOGIN PAGE -->
+    <div id="login-page" class="page">
+        <div class="login-container">
+            <div class="ford-logo">🏭</div>
+            <h1>LAP Roof Tracker</h1>
+            <p>Ford Motor Company — LAP Plant</p>
+            <button id="login-btn" class="btn-primary">
+                Sign In with Ford Account
+            </button>
+        </div>
     </div>
-    <button class="close-btn" onclick="closePopup()">✕</button>
-  </div>
 
-  <div class="popup-status-bar">
-    <span>Current Status: <strong id="popup-current-status"></strong></span>
-    <span>Last Inspected: <strong id="popup-last-date"></strong> by <strong id="popup-last-inspector"></strong></span>
-  </div>
+    <!-- MAIN APP -->
+    <div id="main-app" class="page hidden">
 
-  <!-- SEVERITY SELECTION -->
-  <div class="popup-block">
-    <h3 class="block-title">Select Severity Level</h3>
-    <div class="severity-legend-box">
-      <div class="sev-legend-row"><span class="sev-badge s1">S1</span> Water in Aisle</div>
-      <div class="sev-legend-row"><span class="sev-badge s2">S2</span> Water in Walkway</div>
-      <div class="sev-legend-row"><span class="sev-badge s3">S3</span> Water on Equipment</div>
-      <div class="sev-legend-row"><span class="sev-badge s4">S4</span> Water on Control Panels</div>
-      <div class="sev-legend-row"><span class="sev-badge s5">S5</span> Water on Electrical Bus/Panel or Possible Injury</div>
+        <header>
+            <div class="header-left">
+                <span class="app-title">🏭 LAP Roof Tracker</span>
+            </div>
+            <div class="header-right">
+                <span id="user-name"></span>
+                <button id="logout-btn" class="btn-outline-white">
+                    Sign Out
+                </button>
+            </div>
+        </header>
+
+        <nav>
+            <button class="nav-btn active" data-view="dashboard">
+                📊 Dashboard
+            </button>
+            <button class="nav-btn" data-view="leaks">
+                📋 All Leaks
+            </button>
+            <button class="nav-btn" data-view="add">
+                ➕ Report Leak
+            </button>
+            <button class="nav-btn" data-view="import">
+                📥 Import Excel
+            </button>
+        </nav>
+
+        <!-- ═══════════════════════════════════════════════════
+             DASHBOARD VIEW
+        ════════════════════════════════════════════════════ -->
+        <div id="dashboard-view" class="view">
+            <h2>Dashboard Summary</h2>
+
+            <div id="critical-alerts" class="alerts-section hidden">
+                <h3>⚠️ CRITICAL ALERTS — IMMEDIATE ACTION REQUIRED</h3>
+                <div id="alerts-list"></div>
+            </div>
+
+            <div class="summary-cards">
+                <div class="card">
+                    <div class="card-number" id="total-count">0</div>
+                    <div class="card-label">Total Active Leaks</div>
+                </div>
+                <div class="card critical">
+                    <div class="card-number" id="s5-count">0</div>
+                    <div class="card-label">S5 — Electrical Risk</div>
+                </div>
+                <div class="card warning">
+                    <div class="card-number" id="s4-count">0</div>
+                    <div class="card-label">S4 — Control Panels</div>
+                </div>
+                <div class="card success">
+                    <div class="card-number" id="rep-count">0</div>
+                    <div class="card-label">Repaired This Month</div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>Leaks by Area</h3>
+                <div class="area-grid" id="area-grid"></div>
+            </div>
+
+            <div class="section">
+                <h3>Leaks by Roofing Contractor</h3>
+                <div class="contractor-grid" id="contractor-grid"></div>
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════
+             ALL LEAKS VIEW
+        ════════════════════════════════════════════════════ -->
+        <div id="leaks-view" class="view hidden">
+            <div class="view-header">
+                <h2>All Leak Records</h2>
+                <button class="btn-primary" onclick="showView('add')">
+                    ➕ Report New Leak
+                </button>
+            </div>
+
+            <div class="filters">
+                <select id="filter-area">
+                    <option value="">All Areas</option>
+                    <option>Body</option>
+                    <option>Paint</option>
+                    <option>Final</option>
+                    <option>Facilities</option>
+                </select>
+                <select id="filter-severity">
+                    <option value="">All Severities</option>
+                    <option>S1</option>
+                    <option>S2</option>
+                    <option>S3</option>
+                    <option>S4</option>
+                    <option>S5</option>
+                    <option>REP</option>
+                </select>
+                <select id="filter-contractor">
+                    <option value="">All Contractors</option>
+                    <option>Schriber</option>
+                    <option>Royal</option>
+                    <option>Techta</option>
+                </select>
+                <button class="btn-secondary" onclick="applyFilters()">
+                    🔍 Filter
+                </button>
+                <button class="btn-outline" onclick="clearFilters()">
+                    ✖ Clear
+                </button>
+            </div>
+
+            <div class="table-container">
+                <table id="leaks-table">
+                    <thead>
+                        <tr>
+                            <th>Area</th>
+                            <th>Building</th>
+                            <th>Being Worked On</th>
+                            <th>Call In Date</th>
+                            <th>Severity</th>
+                            <th>Repair Date</th>
+                            <th>Contractor</th>
+                            <th>Tarped</th>
+                            <th>Comments / Source</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leaks-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════
+             ADD / EDIT LEAK VIEW
+        ════════════════════════════════════════════════════ -->
+        <div id="add-view" class="view hidden">
+            <h2 id="form-title">Report New Leak</h2>
+            <form id="leak-form">
+                <input type="hidden" id="edit-row-index">
+
+                <div class="form-grid">
+
+                    <div class="form-group">
+                        <label>Area *</label>
+                        <select id="f-area" required>
+                            <option value="">Select Area</option>
+                            <option>Body</option>
+                            <option>Paint</option>
+                            <option>Final</option>
+                            <option>Facilities</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Building</label>
+                        <input type="text" id="f-building"
+                               placeholder="Building name or number">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Currently Being Worked On</label>
+                        <select id="f-working">
+                            <option value="">Select</option>
+                            <option>Yes</option>
+                            <option>No</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Call In Date *</label>
+                        <input type="date" id="f-callin-date" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Severity *</label>
+                        <select id="f-severity" required>
+                            <option value="">Select Severity</option>
+                            <option value="S1">
+                                S1 — Water in Aisle
+                            </option>
+                            <option value="S2">
+                                S2 — Water in Walkway
+                            </option>
+                            <option value="S3">
+                                S3 — Water on Equipment
+                            </option>
+                            <option value="S4">
+                                S4 — Water on Control Panels
+                            </option>
+                            <option value="S5">
+                                S5 — Electrical Bus / Possible Injury
+                            </option>
+                            <option value="REP">
+                                REP — Repaired
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Repair Date</label>
+                        <input type="date" id="f-repair-date">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Roofing Contractor</label>
+                        <select id="f-contractor">
+                            <option value="">Select Contractor</option>
+                            <option>Schriber</option>
+                            <option>Royal</option>
+                            <option>Techta</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Tarped</label>
+                        <select id="f-tarped">
+                            <option value="">Select</option>
+                            <option>Yes</option>
+                            <option>No</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label>Comments / Possible Source</label>
+                        <textarea id="f-comments" rows="4"
+                            placeholder="Describe the leak location, 
+possible source, and any relevant notes..."></textarea>
+                    </div>
+
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">
+                        💾 Save Leak Record
+                    </button>
+                    <button type="button" class="btn-outline"
+                            onclick="showView('leaks')">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════
+             IMPORT VIEW
+        ════════════════════════════════════════════════════ -->
+        <div id="import-view" class="view hidden">
+            <h2>Import Excel File</h2>
+
+            <div class="import-container">
+
+                <!-- Column Format Guide -->
+                <div class="import-info">
+                    <h3>📋 Expected Column Format</h3>
+                    <table class="format-table">
+                        <thead>
+                            <tr>
+                                <th>Column</th>
+                                <th>Header Name</th>
+                                <th>Example</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>A</td>
+                                <td>AREA</td>
+                                <td>Body, Paint, Final, Facilities</td>
+                            </tr>
+                            <tr>
+                                <td>B</td>
+                                <td>Building</td>
+                                <td>MB, B2, PB</td>
+                            </tr>
+                            <tr>
+                                <td>C</td>
+                                <td>Currently Being Worked On</td>
+                                <td>Yes / No</td>
+                            </tr>
+                            <tr>
+                                <td>D</td>
+                                <td>Call in Date</td>
+                                <td>1/15/2026</td>
+                            </tr>
+                            <tr>
+                                <td>E</td>
+                                <td>Severity</td>
+                                <td>S1, S2, S3, S4, S5, REP
+                                    or 1, 2, 3, 4, 5</td>
+                            </tr>
+                            <tr>
+                                <td>F</td>
+                                <td>Repair Date</td>
+                                <td>1/20/2026</td>
+                            </tr>
+                            <tr>
+                                <td>G</td>
+                                <td>Roofing Contractor</td>
+                                <td>Schriber, Royal, Techta</td>
+                            </tr>
+                            <tr>
+                                <td>H</td>
+                                <td>Tarped</td>
+                                <td>Yes / No</td>
+                            </tr>
+                            <tr>
+                                <td>I</td>
+                                <td>Comments</td>
+                                <td>Leak near drain. REPAIRED.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Drop Zone -->
+                <div class="import-upload-box" id="drop-zone">
+                    <div class="upload-icon">📂</div>
+                    <p class="upload-title">Drop Your Excel File Here</p>
+                    <p class="upload-sub">or</p>
+                    <label for="excel-file-input"
+                           class="btn-primary upload-label">
+                        Browse for File
+                    </label>
+                    <input type="file"
+                           id="excel-file-input"
+                           accept=".xlsx,.xls,.csv"
+                           style="display:none">
+                    <p class="upload-note">
+                        Supports .xlsx .xls .csv
+                    </p>
+                </div>
+
+                <!-- Preview Section -->
+                <div id="import-preview" class="hidden">
+                    <div class="preview-header">
+                        <div>
+                            <h3>📊 Preview Import Data</h3>
+                            <p id="preview-count" class="preview-count">
+                            </p>
+                        </div>
+                        <div class="preview-actions">
+                            <button class="btn-outline"
+                                    onclick="clearImport()">
+                                ✖ Cancel
+                            </button>
+                            <button class="btn-primary"
+                                    id="confirm-import-btn"
+                                    onclick="confirmImport()">
+                                ✅ Import All Records
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Validation Warnings -->
+                    <div id="import-warnings" class="hidden">
+                        <h4>⚠️ Warnings — Review Before Importing</h4>
+                        <ul id="warnings-list"></ul>
+                    </div>
+
+                    <div class="table-container">
+                        <table id="preview-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Area</th>
+                                    <th>Building</th>
+                                    <th>Working On</th>
+                                    <th>Call In Date</th>
+                                    <th>Severity</th>
+                                    <th>Repair Date</th>
+                                    <th>Contractor</th>
+                                    <th>Tarped</th>
+                                    <th>Comments</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="preview-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Import Progress -->
+                <div id="import-progress" class="hidden">
+                    <h3>⏳ Importing Records...</h3>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar" id="progress-bar">
+                        </div>
+                    </div>
+                    <p id="progress-text">0 of 0 records uploaded</p>
+                </div>
+
+                <!-- Import Complete -->
+                <div id="import-complete" class="hidden">
+                    <div class="complete-box">
+                        <div class="complete-icon">✅</div>
+                        <h3>Import Complete!</h3>
+                        <p id="complete-text"></p>
+                        <div class="complete-actions">
+                            <button class="btn-primary"
+                                    onclick="showView('leaks')">
+                                📋 View All Leaks
+                            </button>
+                            <button class="btn-outline"
+                                    onclick="clearImport()">
+                                📥 Import Another File
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </div><!-- END main-app -->
+
+    <!-- LOADING OVERLAY -->
+    <div id="loading" class="loading hidden">
+        <div class="spinner"></div>
+        <p>Loading...</p>
     </div>
-    <div class="sev-btn-row">
-      <button id="sev-btn-S1" class="sev-btn s1-btn" onclick="selectSeverity('S1')">S1</button>
-      <button id="sev-btn-S2" class="sev-btn s2-btn" onclick="selectSeverity('S2')">S2</button>
-      <button id="sev-btn-S3" class="sev-btn s3-btn" onclick="selectSeverity('S3')">S3</button>
-      <button id="sev-btn-S4" class="sev-btn s4-btn" onclick="selectSeverity('S4')">S4</button>
-      <button id="sev-btn-S5" class="sev-btn s5-btn" onclick="selectSeverity('S5')">S5</button>
-    </div>
-  </div>
 
-  <!-- REPAIRED TOGGLE — hidden until severity selected -->
-  <div id="repaired-section" class="popup-block hidden">
-    <button id="repaired-btn" class="repaired-toggle-btn" onclick="toggleRepairedStatus()">
-      Mark as Repaired
-    </button>
-  </div>
+    <!-- ═══════════════════════════════════════════════════════
+         SCRIPTS — ORDER MATTERS
+    ════════════════════════════════════════════════════════ -->
+    <script src="auth-config.js"></script>
+    <script src="graph.js"></script>
+    <script src="app.js"></script>
+    <script src="import.js"></script>
 
-  <!-- INSPECTOR DETAILS -->
-  <div class="popup-block">
-    <label class="form-label">Inspector Name</label>
-    <input type="text" id="input-inspector" class="form-input" placeholder="Enter your name" />
-
-    <label class="form-label">Work Order #</label>
-    <input type="text" id="input-wo" class="form-input" placeholder="Optional" />
-
-    <label class="form-label">📷 Photo Link</label>
-    <input type="text" id="input-photo" class="form-input" placeholder="Paste OneDrive or SharePoint link" />
-
-    <label class="form-label">Notes</label>
-    <textarea id="input-notes" class="form-textarea" placeholder="Describe condition, location of issue, etc."></textarea>
-  </div>
-
-  <!-- ACTION BUTTONS -->
-  <div class="popup-actions">
-    <button class="btn-cancel" onclick="closePopup()">Cancel</button>
-    <button class="btn-save" onclick="saveBay()">Save Inspection</button>
-  </div>
-
-  <!-- HISTORY LOG -->
-  <div class="popup-block history-block">
-    <h3 class="block-title">📋 Inspection History</h3>
-    <div id="history-log"></div>
-  </div>
-
-</div>
-
-<script src="app.js"></script>
 </body>
 </html>
