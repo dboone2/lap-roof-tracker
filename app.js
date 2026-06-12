@@ -1,414 +1,369 @@
-// ============================================
-// LAP ROOF TRACKER — app.js v3
-// Main Building — Severity Based Tracking
-// ============================================
+// ============================================================
+// LAP ROOF TRACKER — MAIN APPLICATION
+// Column Order: Area | Bay | Building | Working On |
+//               Call In Date | Severity | Repair Date |
+//               Contractor | Tarped | Comments
+// ============================================================
 
-const ROWS = [
-  { label: "A", section: "Main Body" },
-  { label: "B", section: "Main Body" },
-  { label: "C", section: "Main Body" },
-  { label: "D", section: "Main Body" },
-  { label: "E", section: "Main Body" },
-  { label: "F", section: "Main Body" },
-  { label: "G", section: "Main Body" },
-  { label: "H", section: "Main Body" },
-  { label: "J", section: "Main Body" },
-  { label: "K", section: "Main Body" },
-  { label: "L", section: "Main Body" },
-  { label: "M", section: "Main Body" },
-  { label: "N", section: "Main Body" },
-  { label: "P", section: "Main Body" },
-  { label: "Q", section: "Main Body" },
-];
+let msalInstance;
+let currentUser = null;
+let allLeaks    = [];
 
-const COLS = [
-  "013","012","011","010","09","08","07","06","05","04","03","02","01",
-  "1","2","3","4","5","6","7","8","9","10","11","12","13","14","15",
-  "16","17","18","19","20","21","22","23","24","25","26","27","28",
-  "29","30","31","32","33","34","35","36","37","38","39","40","41",
-  "42","43","44","45","46"
-];
+// ── INITIALIZE ───────────────────────────────────────────────
+window.onload = async () => {
+    msalInstance = new msal.PublicClientApplication(msalConfig);
+    await msalInstance.initialize();
+    await msalInstance.handleRedirectPromise();
 
-const STORAGE_KEY = "lapRoofData_v3";
-
-let bayData        = {};
-let selectedSeverity = "";
-let isRepaired     = false;
-let activeBayId    = "";
-let hideRepaired   = false;
-
-// ---- INIT ----
-function init() {
-  loadData();
-  buildGrid();
-  updateSummary();
-}
-
-// ---- CREATE EMPTY BAY ----
-function createEmptyBay(id, row, col, section) {
-  return {
-    id,
-    row,
-    col,
-    section,
-    currentStatus:   "Not Inspected",
-    currentSeverity: "",
-    history:         []
-  };
-}
-
-// ---- LOAD DATA ----
-function loadData() {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored) {
-    bayData = JSON.parse(stored);
-  } else {
-    ROWS.forEach(row => {
-      COLS.forEach(col => {
-        const id = row.label + "-" + col;
-        bayData[id] = createEmptyBay(id, row.label, col, row.section);
-      });
-    });
-    saveData();
-  }
-}
-
-// ---- SAVE DATA ----
-function saveData() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(bayData));
-}
-
-// ---- BUILD GRID ----
-function buildGrid() {
-  const thead = document.getElementById("grid-header");
-  const tbody = document.getElementById("grid-body");
-  thead.innerHTML = "";
-  tbody.innerHTML = "";
-
-  // Header row
-  const headerRow = document.createElement("tr");
-  const cornerTh  = document.createElement("th");
-  cornerTh.className   = "row-header-top";
-  cornerTh.textContent = "ROW / COL";
-  headerRow.appendChild(cornerTh);
-
-  COLS.forEach(col => {
-    const th = document.createElement("th");
-    th.textContent = col;
-    if (col === "01") th.classList.add("col-divider");
-    headerRow.appendChild(th);
-  });
-
-  thead.appendChild(headerRow);
-
-  // Data rows
-  ROWS.forEach(row => {
-    const tr = document.createElement("tr");
-
-    const labelTd = document.createElement("td");
-    labelTd.className   = "row-label";
-    labelTd.textContent = row.label;
-    tr.appendChild(labelTd);
-
-    COLS.forEach(col => {
-      const id = row.label + "-" + col;
-      const td = document.createElement("td");
-      td.className = "bay-cell";
-      td.id        = "cell-" + id;
-      td.title     = id + " — " + row.section;
-      if (col === "01") td.classList.add("col-divider");
-      td.onclick   = () => openPopup(id);
-      applyCell(td, bayData[id]);
-      tr.appendChild(td);
-    });
-
-    tbody.appendChild(tr);
-  });
-}
-
-// ---- APPLY CELL DISPLAY ----
-function applyCell(td, bay) {
-  td.classList.remove(
-    "cond-ni","cond-s1","cond-s2","cond-s3",
-    "cond-s4","cond-s5","cond-repaired"
-  );
-
-  if (bay.currentStatus === "Repaired") {
-    td.classList.add("cond-repaired");
-    td.innerHTML   = bay.id + "<br><small>" + bay.currentSeverity + " ✅</small>";
-    td.style.opacity = hideRepaired ? "0.15" : "1";
-  } else if (bay.currentSeverity) {
-    td.classList.add("cond-" + bay.currentSeverity.toLowerCase());
-    td.innerHTML   = bay.id + "<br><small>" + bay.currentSeverity + "</small>";
-    td.style.opacity = "1";
-  } else {
-    td.classList.add("cond-ni");
-    td.textContent = bay.id;
-    td.style.opacity = "1";
-  }
-}
-
-// ---- UPDATE SINGLE CELL ----
-function updateCell(bayId) {
-  const td = document.getElementById("cell-" + bayId);
-  if (td) applyCell(td, bayData[bayId]);
-}
-
-// ---- UPDATE SUMMARY COUNTS ----
-function updateSummary() {
-  let total = 0, ni = 0, s1 = 0, s2 = 0, s3 = 0, s4 = 0, s5 = 0, repaired = 0;
-
-  Object.values(bayData).forEach(b => {
-    total++;
-    if (b.currentStatus === "Repaired") { repaired++; return; }
-    switch (b.currentSeverity) {
-      case "S1": s1++; break;
-      case "S2": s2++; break;
-      case "S3": s3++; break;
-      case "S4": s4++; break;
-      case "S5": s5++; break;
-      default:   ni++; break;
-    }
-  });
-
-  document.getElementById("count-total").textContent    = total;
-  document.getElementById("count-ni").textContent       = ni;
-  document.getElementById("count-s1").textContent       = s1;
-  document.getElementById("count-s2").textContent       = s2;
-  document.getElementById("count-s3").textContent       = s3;
-  document.getElementById("count-s4").textContent       = s4;
-  document.getElementById("count-s5").textContent       = s5;
-  document.getElementById("count-repaired").textContent = repaired;
-}
-
-// ---- OPEN POPUP ----
-function openPopup(bayId) {
-  activeBayId      = bayId;
-  selectedSeverity = "";
-  isRepaired       = false;
-
-  const bay = bayData[bayId];
-
-  document.getElementById("popup-bay-id").textContent      = bayId;
-  document.getElementById("popup-section").textContent     = bay.section;
-
-  const statusText = bay.currentStatus +
-    (bay.currentSeverity ? " (" + bay.currentSeverity + ")" : "");
-  document.getElementById("popup-current-status").textContent = statusText;
-
-  const lastEntry = bay.history.length > 0
-    ? bay.history[bay.history.length - 1]
-    : null;
-
-  document.getElementById("popup-last-date").textContent =
-    lastEntry ? lastEntry.date : "Never";
-  document.getElementById("popup-last-inspector").textContent =
-    lastEntry ? lastEntry.inspector : "-";
-
-  // Reset form
-  document.getElementById("input-inspector").value = "";
-  document.getElementById("input-wo").value        = "";
-  document.getElementById("input-notes").value     = "";
-  document.getElementById("input-photo").value     = "";
-
-  // Reset severity buttons
-  document.querySelectorAll(".sev-btn").forEach(b => b.classList.remove("selected"));
-
-  // Hide repaired section and reset its button
-  document.getElementById("repaired-section").classList.add("hidden");
-  const repairedBtn = document.getElementById("repaired-btn");
-  repairedBtn.classList.remove("active");
-  repairedBtn.textContent = "Mark as Repaired";
-
-  // Build history log
-  buildHistoryLog(bay);
-
-  document.getElementById("overlay").classList.remove("hidden");
-  document.getElementById("popup").classList.remove("hidden");
-}
-
-// ---- SELECT SEVERITY ----
-function selectSeverity(sev) {
-  selectedSeverity = sev;
-  isRepaired       = false;
-
-  document.querySelectorAll(".sev-btn").forEach(b => b.classList.remove("selected"));
-  document.getElementById("sev-btn-" + sev).classList.add("selected");
-
-  // Reveal repaired toggle and reset it
-  document.getElementById("repaired-section").classList.remove("hidden");
-  const repairedBtn = document.getElementById("repaired-btn");
-  repairedBtn.classList.remove("active");
-  repairedBtn.textContent = "Mark as Repaired";
-}
-
-// ---- TOGGLE REPAIRED STATUS INSIDE POPUP ----
-function toggleRepairedStatus() {
-  isRepaired = !isRepaired;
-  const btn  = document.getElementById("repaired-btn");
-  if (isRepaired) {
-    btn.classList.add("active");
-    btn.textContent = "✅ Marked as Repaired — Click to Undo";
-  } else {
-    btn.classList.remove("active");
-    btn.textContent = "Mark as Repaired";
-  }
-}
-
-// ---- BUILD HISTORY LOG ----
-function buildHistoryLog(bay) {
-  const log = document.getElementById("history-log");
-
-  if (!bay.history || bay.history.length === 0) {
-    log.innerHTML = "<p class='no-history'>No inspection history yet.</p>";
-    return;
-  }
-
-  const entries = [...bay.history].reverse();
-
-  log.innerHTML = entries.map(e => {
-    const isRep      = e.status === "Repaired";
-    const sevClass   = e.severity ? "sev-" + e.severity.toLowerCase() : "";
-    const woHTML     = e.workOrder
-      ? `<span>WO#: ${e.workOrder}</span>` : "";
-    const notesHTML  = e.notes
-      ? `<div class="hist-notes">${e.notes}</div>` : "";
-    const photoHTML  = e.photoLink
-      ? `<div class="hist-photo">
-           <a href="${e.photoLink}" target="_blank" rel="noopener">📷 View Photo</a>
-         </div>` : "";
-
-    return `
-      <div class="history-entry ${isRep ? 'hist-repaired' : 'hist-issue'}">
-        <div class="hist-header">
-          <span class="hist-date">${e.date}</span>
-          <span class="hist-severity ${sevClass}">${e.severity || ""}</span>
-          <span class="hist-status ${isRep ? 'repaired' : ''}">${e.status}</span>
-        </div>
-        <div class="hist-details">
-          <span>Inspector: ${e.inspector}</span>
-          ${woHTML}
-        </div>
-        ${notesHTML}
-        ${photoHTML}
-      </div>
-    `;
-  }).join("");
-}
-
-// ---- SAVE BAY ----
-function saveBay() {
-  if (!selectedSeverity) {
-    alert("Please select a severity level (S1 – S5) before saving.");
-    return;
-  }
-
-  const inspector = document.getElementById("input-inspector").value.trim() || "Unknown";
-  const workOrder  = document.getElementById("input-wo").value.trim();
-  const notes      = document.getElementById("input-notes").value.trim();
-  const photoLink  = document.getElementById("input-photo").value.trim();
-  const today      = new Date().toLocaleDateString("en-US");
-  const status     = isRepaired ? "Repaired" : "Issue";
-
-  const entry = { date: today, inspector, severity: selectedSeverity,
-                  status, workOrder, notes, photoLink };
-
-  if (!bayData[activeBayId].history) bayData[activeBayId].history = [];
-  bayData[activeBayId].history.push(entry);
-  bayData[activeBayId].currentSeverity = selectedSeverity;
-  bayData[activeBayId].currentStatus   = status;
-
-  saveData();
-  updateCell(activeBayId);
-  updateSummary();
-  closePopup();
-}
-
-// ---- TOGGLE REPAIRED VIEW — HEADER BUTTON ----
-function toggleRepairedView() {
-  hideRepaired    = !hideRepaired;
-  const btn       = document.getElementById("toggle-repaired-btn");
-  btn.textContent = hideRepaired ? "Show Repaired Bays" : "Hide Repaired Bays";
-  hideRepaired ? btn.classList.add("active") : btn.classList.remove("active");
-  Object.keys(bayData).forEach(id => updateCell(id));
-}
-
-// ---- CLOSE POPUP ----
-function closePopup() {
-  document.getElementById("overlay").classList.add("hidden");
-  document.getElementById("popup").classList.add("hidden");
-  activeBayId      = "";
-  selectedSeverity = "";
-  isRepaired       = false;
-}
-
-// ---- EXPORT CSV ----
-function exportCSV() {
-  const headers = [
-    "Bay ID","Row","Column","Section",
-    "Current Status","Current Severity",
-    "Entry #","Date","Inspector","Severity",
-    "Status","Work Order","Notes","Photo Link"
-  ];
-
-  const rows = [];
-  Object.values(bayData).forEach(b => {
-    if (b.history && b.history.length > 0) {
-      b.history.forEach((h, i) => {
-        rows.push([
-          b.id, b.row, b.col, b.section,
-          b.currentStatus, b.currentSeverity,
-          i + 1, h.date, h.inspector, h.severity,
-          h.status, h.workOrder, h.notes, h.photoLink
-        ]);
-      });
+    const accounts = msalInstance.getAllAccounts();
+    if (accounts.length > 0) {
+        await initializeApp();
     } else {
-      rows.push([
-        b.id, b.row, b.col, b.section,
-        "Not Inspected", "",
-        "", "", "", "", "", "", "", ""
-      ]);
+        showPage("login-page");
     }
-  });
+};
 
-  const csv = [
-    headers.join(","),
-    ...rows.map(r =>
-      r.map(v => `"${(v || "").toString().replace(/"/g, '""')}"`)
-       .join(",")
-    )
-  ].join("\n");
+// ── AUTH ─────────────────────────────────────────────────────
+document.getElementById("login-btn")
+    .addEventListener("click", async () => {
+    try {
+        await msalInstance.loginRedirect(loginRequest);
+    } catch (e) {
+        console.error("Login error:", e);
+    }
+});
 
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement("a");
-  a.href     = url;
-  a.download = "LAP_Roof_Tracker_" + new Date().toISOString().slice(0,10) + ".csv";
-  a.click();
-  URL.revokeObjectURL(url);
+document.getElementById("logout-btn")
+    .addEventListener("click", () => {
+    msalInstance.logoutRedirect();
+});
+
+async function initializeApp() {
+    showLoading(true);
+    try {
+        const profile = await getUserProfile();
+        currentUser   = profile;
+        document.getElementById("user-name").textContent =
+            profile.displayName;
+        showPage("main-app");
+        await loadLeaks();
+        showView("dashboard");
+    } catch (e) {
+        console.error("Init error:", e);
+        alert("Error loading app: " + e.message);
+    }
+    showLoading(false);
 }
 
-// ---- RESET ALL ----
-function resetAll() {
-  if (!confirm(
-    "Reset ALL bay data back to Not Inspected?\n\n" +
-    "This will erase all history and cannot be undone."
-  )) return;
+// ── DATA ─────────────────────────────────────────────────────
+async function loadLeaks() {
+    showLoading(true);
+    try {
+        const rows = await getLeakRows();
+        allLeaks   = rows.map((row, index) => ({
+            index,
+            area       : String(row.values[0][0] || ""),
+            bay        : String(row.values[0][1] || ""),
+            building   : String(row.values[0][2] || ""),
+            workingOn  : String(row.values[0][3] || ""),
+            callInDate : String(row.values[0][4] || ""),
+            severity   : String(row.values[0][5] || ""),
+            repairDate : String(row.values[0][6] || ""),
+            contractor : String(row.values[0][7] || ""),
+            tarped     : String(row.values[0][8] || ""),
+            comments   : String(row.values[0][9] || "")
+        }));
+    } catch (e) {
+        console.warn("Could not load from SharePoint:", e.message);
+        allLeaks = [];
+    }
+    renderDashboard();
+    renderLeaksTable(allLeaks);
+    showLoading(false);
+}
 
-  ROWS.forEach(row => {
-    COLS.forEach(col => {
-      const id = row.label + "-" + col;
-      bayData[id] = createEmptyBay(id, row.label, col, row.section);
+// ── DASHBOARD ────────────────────────────────────────────────
+function renderDashboard() {
+    const activeLeaks = allLeaks.filter(l => l.severity !== "REP");
+    const now         = new Date();
+
+    // Summary counts
+    document.getElementById("total-count").textContent =
+        activeLeaks.length;
+    document.getElementById("s5-count").textContent =
+        allLeaks.filter(l => l.severity === "S5").length;
+    document.getElementById("s4-count").textContent =
+        allLeaks.filter(l => l.severity === "S4").length;
+    document.getElementById("rep-count").textContent =
+        allLeaks.filter(l => {
+            if (l.severity !== "REP" || !l.repairDate) return false;
+            const d = new Date(l.repairDate);
+            return d.getMonth()    === now.getMonth() &&
+                   d.getFullYear() === now.getFullYear();
+        }).length;
+
+    // Critical Alerts (S4 and S5)
+    const critical      = allLeaks.filter(l =>
+        l.severity === "S4" || l.severity === "S5");
+    const alertsSection =
+        document.getElementById("critical-alerts");
+    const alertsList    =
+        document.getElementById("alerts-list");
+
+    if (critical.length > 0) {
+        alertsSection.classList.remove("hidden");
+        alertsList.innerHTML = critical.map(l => `
+            <div class="alert-item ${l.severity === "S5"
+                ? "alert-s5" : "alert-s4"}">
+                <strong>${l.severity}</strong>
+                — ${l.area} | Bay: ${l.bay}
+                | Building: ${l.building}
+                | Called In: ${l.callInDate}
+                | Contractor: ${l.contractor || "Unassigned"}
+                <br><small>${l.comments}</small>
+            </div>
+        `).join("");
+    } else {
+        alertsSection.classList.add("hidden");
+    }
+
+    // By Area
+    const areas    = ["Body", "Paint", "Final", "Facilities"];
+    const areaGrid = document.getElementById("area-grid");
+    areaGrid.innerHTML = areas.map(area => {
+        const count    = activeLeaks.filter(
+            l => l.area === area).length;
+        const s4s5     = allLeaks.filter(l =>
+            l.area === area &&
+            (l.severity === "S4" || l.severity === "S5")).length;
+        const repaired = allLeaks.filter(l =>
+            l.area === area && l.severity === "REP").length;
+        return `
+            <div class="area-card ${s4s5 > 0 ? "has-critical" : ""}">
+                <div class="area-name">${area}</div>
+                <div class="area-count">${count}</div>
+                <div class="area-label">Active Leaks</div>
+                <div class="area-repaired">
+                    ✅ ${repaired} Repaired
+                </div>
+                ${s4s5 > 0
+                    ? `<div class="area-critical">
+                           ⚠️ ${s4s5} Critical
+                       </div>`
+                    : ""}
+            </div>`;
+    }).join("");
+
+    // By Contractor
+    const contractors    = ["Schriber", "Royal", "Techta"];
+    const contractorGrid =
+        document.getElementById("contractor-grid");
+    contractorGrid.innerHTML = contractors.map(c => {
+        const total    = allLeaks.filter(
+            l => l.contractor === c).length;
+        const active   = allLeaks.filter(l =>
+            l.contractor === c && l.severity !== "REP").length;
+        const repaired = allLeaks.filter(l =>
+            l.contractor === c && l.severity === "REP").length;
+        return `
+            <div class="contractor-card">
+                <div class="contractor-name">🏗️ ${c}</div>
+                <div class="contractor-stats">
+                    <div class="stat">
+                        <span class="stat-num">${total}</span>
+                        <span class="stat-label">Total</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-num">${active}</span>
+                        <span class="stat-label">Active</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-num">${repaired}</span>
+                        <span class="stat-label">Repaired</span>
+                    </div>
+                </div>
+            </div>`;
+    }).join("");
+}
+
+// ── TABLE ────────────────────────────────────────────────────
+function renderLeaksTable(leaks) {
+    const tbody = document.getElementById("leaks-tbody");
+
+    if (leaks.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="11" class="no-data">
+                    No leak records found
+                </td>
+            </tr>`;
+        return;
+    }
+
+    tbody.innerHTML = leaks.map(l => `
+        <tr class="${getSeverityClass(l.severity)}">
+            <td>${l.area}</td>
+            <td><strong>${l.bay}</strong></td>
+            <td>${l.building}</td>
+            <td>${l.workingOn}</td>
+            <td>${l.callInDate}</td>
+            <td>
+                <span class="severity-badge
+                      ${getSeverityClass(l.severity)}">
+                    ${l.severity}
+                </span>
+            </td>
+            <td>${l.repairDate}</td>
+            <td>${l.contractor}</td>
+            <td>${l.tarped}</td>
+            <td class="comments-cell"
+                title="${l.comments}">
+                ${l.comments}
+            </td>
+            <td>
+                <button class="btn-small"
+                        onclick="editLeak(${l.index})">
+                    ✏️ Edit
+                </button>
+            </td>
+        </tr>
+    `).join("");
+}
+
+function getSeverityClass(severity) {
+    const map = {
+        S5: "sev-s5", S4: "sev-s4", S3: "sev-s3",
+        S2: "sev-s2", S1: "sev-s1", REP: "sev-rep"
+    };
+    return map[severity] || "";
+}
+
+// ── FILTERS ──────────────────────────────────────────────────
+function applyFilters() {
+    const area       =
+        document.getElementById("filter-area").value;
+    const bay        =
+        document.getElementById("filter-bay").value.trim()
+                                                    .toLowerCase();
+    const severity   =
+        document.getElementById("filter-severity").value;
+    const contractor =
+        document.getElementById("filter-contractor").value;
+
+    let filtered = [...allLeaks];
+
+    if (area)
+        filtered = filtered.filter(l => l.area === area);
+    if (bay)
+        filtered = filtered.filter(l =>
+            l.bay.toLowerCase().includes(bay));
+    if (severity)
+        filtered = filtered.filter(l => l.severity === severity);
+    if (contractor)
+        filtered = filtered.filter(l => l.contractor === contractor);
+
+    renderLeaksTable(filtered);
+}
+
+function clearFilters() {
+    document.getElementById("filter-area").value       = "";
+    document.getElementById("filter-bay").value        = "";
+    document.getElementById("filter-severity").value   = "";
+    document.getElementById("filter-contractor").value = "";
+    renderLeaksTable(allLeaks);
+}
+
+// ── FORM ─────────────────────────────────────────────────────
+document.getElementById("leak-form")
+    .addEventListener("submit", async (e) => {
+    e.preventDefault();
+    showLoading(true);
+
+    const rowData = [
+        document.getElementById("f-area").value,
+        document.getElementById("f-bay").value,
+        document.getElementById("f-building").value,
+        document.getElementById("f-working").value,
+        document.getElementById("f-callin-date").value,
+        document.getElementById("f-severity").value,
+        document.getElementById("f-repair-date").value,
+        document.getElementById("f-contractor").value,
+        document.getElementById("f-tarped").value,
+        document.getElementById("f-comments").value
+    ];
+
+    const editIndex =
+        document.getElementById("edit-row-index").value;
+
+    try {
+        if (editIndex !== "") {
+            await updateLeakRow(parseInt(editIndex), rowData);
+        } else {
+            await addLeakRow(rowData);
+        }
+        await loadLeaks();
+        resetForm();
+        showView("leaks");
+    } catch (e) {
+        console.error("Save error:", e);
+        alert("Error saving record: " + e.message);
+    }
+    showLoading(false);
+});
+
+function editLeak(index) {
+    const leak = allLeaks.find(l => l.index === index);
+    if (!leak) return;
+
+    document.getElementById("form-title").textContent =
+        "Edit Leak Record";
+    document.getElementById("edit-row-index").value   = index;
+    document.getElementById("f-area").value           = leak.area;
+    document.getElementById("f-bay").value            = leak.bay;
+    document.getElementById("f-building").value       = leak.building;
+    document.getElementById("f-working").value        = leak.workingOn;
+    document.getElementById("f-callin-date").value    = leak.callInDate;
+    document.getElementById("f-severity").value       = leak.severity;
+    document.getElementById("f-repair-date").value    = leak.repairDate;
+    document.getElementById("f-contractor").value     = leak.contractor;
+    document.getElementById("f-tarped").value         = leak.tarped;
+    document.getElementById("f-comments").value       = leak.comments;
+
+    showView("add");
+}
+
+function resetForm() {
+    document.getElementById("form-title").textContent =
+        "Report New Leak";
+    document.getElementById("edit-row-index").value = "";
+    document.getElementById("leak-form").reset();
+}
+
+// ── NAVIGATION ───────────────────────────────────────────────
+document.querySelectorAll(".nav-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+        document.querySelectorAll(".nav-btn")
+            .forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        showView(btn.dataset.view);
+        if (btn.dataset.view === "add") resetForm();
     });
-  });
+});
 
-  saveData();
-  buildGrid();
-  updateSummary();
+function showView(viewName) {
+    document.querySelectorAll(".view")
+        .forEach(v => v.classList.add("hidden"));
+    document.getElementById(`${viewName}-view`)
+        .classList.remove("hidden");
 }
 
-// ---- CLOSE ON OVERLAY CLICK ----
-document.getElementById("overlay").addEventListener("click", closePopup);
+function showPage(pageId) {
+    document.querySelectorAll(".page")
+        .forEach(p => p.classList.add("hidden"));
+    document.getElementById(pageId).classList.remove("hidden");
+}
 
-// ---- START ----
-init();
+function showLoading(show) {
+    document.getElementById("loading")
+        .classList.toggle("hidden", !show);
+}
