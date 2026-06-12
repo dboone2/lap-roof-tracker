@@ -112,6 +112,11 @@
                     <option>Final</option>
                     <option>Facilities</option>
                 </select>
+                <input type="text"
+                       id="filter-bay"
+                       placeholder="Search Bay (e.g. A09)"
+                       style="padding:8px 12px; border:1px solid #ddd;
+                              border-radius:6px; font-size:14px;">
                 <select id="filter-severity">
                     <option value="">All Severities</option>
                     <option>S1</option>
@@ -140,6 +145,7 @@
                     <thead>
                         <tr>
                             <th>Area</th>
+                            <th>Bay</th>
                             <th>Building</th>
                             <th>Being Worked On</th>
                             <th>Call In Date</th>
@@ -178,9 +184,16 @@
                     </div>
 
                     <div class="form-group">
+                        <label>Bay *</label>
+                        <input type="text" id="f-bay"
+                               placeholder="e.g. A09, B12, K04"
+                               required>
+                    </div>
+
+                    <div class="form-group">
                         <label>Building</label>
                         <input type="text" id="f-building"
-                               placeholder="Building name or number">
+                               placeholder="MB, B2, PB, MC, PH">
                     </div>
 
                     <div class="form-group">
@@ -249,7 +262,7 @@
                     <div class="form-group full-width">
                         <label>Comments / Possible Source</label>
                         <textarea id="f-comments" rows="4"
-                            placeholder="Describe the leak location, 
+                            placeholder="Describe the leak location,
 possible source, and any relevant notes..."></textarea>
                     </div>
 
@@ -294,42 +307,47 @@ possible source, and any relevant notes..."></textarea>
                             </tr>
                             <tr>
                                 <td>B</td>
-                                <td>Building</td>
-                                <td>MB, B2, PB</td>
+                                <td>BAY</td>
+                                <td>A09, B12, K04, CMM</td>
                             </tr>
                             <tr>
                                 <td>C</td>
+                                <td>Building</td>
+                                <td>MB, B2, PB, MC, PH</td>
+                            </tr>
+                            <tr>
+                                <td>D</td>
                                 <td>Currently Being Worked On</td>
                                 <td>Yes / No</td>
                             </tr>
                             <tr>
-                                <td>D</td>
+                                <td>E</td>
                                 <td>Call in Date</td>
                                 <td>1/15/2026</td>
                             </tr>
                             <tr>
-                                <td>E</td>
+                                <td>F</td>
                                 <td>Severity</td>
                                 <td>S1, S2, S3, S4, S5, REP
                                     or 1, 2, 3, 4, 5</td>
                             </tr>
                             <tr>
-                                <td>F</td>
+                                <td>G</td>
                                 <td>Repair Date</td>
                                 <td>1/20/2026</td>
                             </tr>
                             <tr>
-                                <td>G</td>
+                                <td>H</td>
                                 <td>Roofing Contractor</td>
                                 <td>Schriber, Royal, Techta</td>
                             </tr>
                             <tr>
-                                <td>H</td>
+                                <td>I</td>
                                 <td>Tarped</td>
                                 <td>Yes / No</td>
                             </tr>
                             <tr>
-                                <td>I</td>
+                                <td>J</td>
                                 <td>Comments</td>
                                 <td>Leak near drain. REPAIRED.</td>
                             </tr>
@@ -340,7 +358,9 @@ possible source, and any relevant notes..."></textarea>
                 <!-- Drop Zone -->
                 <div class="import-upload-box" id="drop-zone">
                     <div class="upload-icon">📂</div>
-                    <p class="upload-title">Drop Your Excel File Here</p>
+                    <p class="upload-title">
+                        Drop Your Excel File Here
+                    </p>
                     <p class="upload-sub">or</p>
                     <label for="excel-file-input"
                            class="btn-primary upload-label">
@@ -360,8 +380,8 @@ possible source, and any relevant notes..."></textarea>
                     <div class="preview-header">
                         <div>
                             <h3>📊 Preview Import Data</h3>
-                            <p id="preview-count" class="preview-count">
-                            </p>
+                            <p id="preview-count"
+                               class="preview-count"></p>
                         </div>
                         <div class="preview-actions">
                             <button class="btn-outline"
@@ -388,6 +408,7 @@ possible source, and any relevant notes..."></textarea>
                                 <tr>
                                     <th>#</th>
                                     <th>Area</th>
+                                    <th>Bay</th>
                                     <th>Building</th>
                                     <th>Working On</th>
                                     <th>Call In Date</th>
